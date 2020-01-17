@@ -586,18 +586,25 @@ def generic(bids_base, template,
 	if model_prediction_mask == True:
 		from samri.masking.predict_mask import predict_mask
 		masked_image = pe.Node(name='masked_image', interface=util.Function(function=predict_mask, input_names=inspect.getargspec(predict_mask)[0], output_names=['out_file']))
+		# if model_prediction_mask == True AND functional_blur_xy == True:
 		if functional_blur_xy:
+			blur = pe.Node(interface=afni.preprocess.BlurToFWHM(), name="blur")
+			blur.inputs.fwhmxy = functional_blur_xy
 			workflow_connections.extend([
 				(get_f_scan, masked_image, [('out_file', 'in_file')]),
 				(masked_image, blur, [('out_file', 'in_file')]),
+				(f_warp, blur, [('output_image', 'in_file')]),
+				(blur, datasink, [('out_file', 'func')]),
 				])
+		# if model_prediction_mask == True AND functional_blur_xy == False:
 		else:
 				workflow_connections.extend([
 					(get_f_scan, masked_image, [('out_file', 'in_file')]),
 					(masked_image, f_warp, [('out_file', 'in_file')]),
+					(f_warp, datasink, [('output_image', 'func')]),
 				])
-
-	elif functional_blur_xy:	#if model_prediction_mask == False AND functional_blur_xy == True
+	# if model_prediction_mask == False AND functional_blur_xy == True:
+	elif functional_blur_xy:
 		blur = pe.Node(interface=afni.preprocess.BlurToFWHM(), name="blur")
 		blur.inputs.fwhmxy = functional_blur_xy
 		workflow_connections.extend([
@@ -605,6 +612,7 @@ def generic(bids_base, template,
 			(f_warp, blur, [('output_image', 'in_file')]),
 			(blur, datasink, [('out_file', 'func')]),
 			])
+	# if model_prediction_mask == False AND functional_blur_xy == False:
 	else:
 		workflow_connections.extend([
 			(get_f_scan, f_warp, [('nii_name','output_image')]),
