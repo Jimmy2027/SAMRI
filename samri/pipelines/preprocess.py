@@ -320,7 +320,7 @@ def generic(bids_base, template,
 	workflow_name='generic',
 	params={},
 	phase_dictionary=GENERIC_PHASES,
-	enforce_dummy_scans=DUMMY_SCANS,
+	enforce_dummy_scans=DUMMY_SCANS, model_prediction_mask = False,
 	):
 	'''
 	Generic preprocessing and registration workflow for small animal data in BIDS format.
@@ -372,6 +372,7 @@ def generic(bids_base, template,
 	workflow_name : str, optional
 		Top level name for the output directory.
 	'''
+
 
 	bids_base, out_base, out_dir, template, registration_mask, data_selection, functional_scan_types, structural_scan_types, subjects_sessions, func_ind, struct_ind = common_select(
 			bids_base,
@@ -427,6 +428,7 @@ def generic(bids_base, template,
 		workflow_connections.extend([
 			(dummy_scans, realigner, [('out_file', 'in_file')]),
 			])
+
 
 	elif realign == "spacetime":
 		realigner = pe.Node(interface=nipy.SpaceTimeRealigner(), name="realigner")
@@ -581,7 +583,21 @@ def generic(bids_base, template,
 				])
 
 
-	if functional_blur_xy:
+	if model_prediction_mask == True:
+		from samri.masking.predict_mask import predict_mask
+		masked_image = pe.Node(name='masked_image', interface=util.Function(function=predict_mask, input_names=inspect.getargspec(predict_mask)[0], output_names=['out_file']))
+		if functional_blur_xy:
+			workflow_connections.extend([
+				(get_f_scan, masked_image, [('out_file', 'in_file')]),
+				(masked_image, blur, [('out_file', 'in_file')]),
+				])
+		else:
+				workflow_connections.extend([
+					(get_f_scan, masked_image, [('out_file', 'in_file')]),
+					(masked_image, f_warp, [('out_file', 'in_file')]),
+				])
+
+	elif functional_blur_xy:	#if model_prediction_mask == False AND functional_blur_xy == True
 		blur = pe.Node(interface=afni.preprocess.BlurToFWHM(), name="blur")
 		blur.inputs.fwhmxy = functional_blur_xy
 		workflow_connections.extend([
