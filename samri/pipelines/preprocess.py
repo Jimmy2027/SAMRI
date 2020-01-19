@@ -478,11 +478,24 @@ def generic(bids_base, template,
 				(s_warp, datasink, [('output_image', 'anat')]),
 				])
 
-		workflow_connections.extend([
-			(get_f_scan, get_s_scan, [('subject_session', 'selector')]),
-			(get_s_scan, s_warp, [('nii_name','output_image')]),
-			(get_s_scan, s_biascorrect, [('nii_path', 'input_image')]),
+		if model_prediction_mask == True:
+			from samri.masking.predict_mask import predict_mask
+			masked_image = pe.Node(name='masked_image', interface=util.Function(function=predict_mask, input_names=
+			inspect.getargspec(predict_mask)[0], output_names=['out_file']))
+
+			workflow_connections.extend([
+				(get_f_scan, get_s_scan, [('subject_session', 'selector')]),
+				(get_s_scan, s_warp, [('nii_name', 'output_image')]),
+				(get_s_scan, masked_image, [('nii_path', 'in_file')]),
+				(masked_image, s_biascorrect, [('out_file', 'input_image')]),
 			])
+
+		else:
+			workflow_connections.extend([
+				(get_f_scan, get_s_scan, [('subject_session', 'selector')]),
+				(get_s_scan, s_warp, [('nii_name','output_image')]),
+				(get_s_scan, s_biascorrect, [('nii_path', 'input_image')]),
+				])
 
 	if functional_registration_method == "structural":
 		if not structural_scan_types.any():
@@ -582,42 +595,19 @@ def generic(bids_base, template,
 				(dummy_scans, f_warp, [('out_file', 'input_image')]),
 				])
 
-
-	if model_prediction_mask == True:
-		from samri.masking.predict_mask import predict_mask
-		masked_image = pe.Node(name='masked_image', interface=util.Function(function=predict_mask, input_names=inspect.getargspec(predict_mask)[0], output_names=['out_file']))
-		# if model_prediction_mask == True AND functional_blur_xy == True:
-		if functional_blur_xy:
-			blur = pe.Node(interface=afni.preprocess.BlurToFWHM(), name="blur")
-			blur.inputs.fwhmxy = functional_blur_xy
-			workflow_connections.extend([
-				(get_f_scan, masked_image, [('out_file', 'in_file')]),
-				(masked_image, blur, [('out_file', 'in_file')]),
-				(f_warp, blur, [('output_image', 'in_file')]),
-				(blur, datasink, [('out_file', 'func')]),
-				])
-		# if model_prediction_mask == True AND functional_blur_xy == False:
-		else:
-				workflow_connections.extend([
-					(get_f_scan, masked_image, [('out_file', 'in_file')]),
-					(masked_image, f_warp, [('out_file', 'in_file')]),
-					(f_warp, datasink, [('output_image', 'func')]),
-				])
-	# if model_prediction_mask == False AND functional_blur_xy == True:
-	elif functional_blur_xy:
+	if functional_blur_xy:
 		blur = pe.Node(interface=afni.preprocess.BlurToFWHM(), name="blur")
 		blur.inputs.fwhmxy = functional_blur_xy
 		workflow_connections.extend([
-			(get_f_scan, blur, [('nii_name','out_file')]),
+			(get_f_scan, blur, [('nii_name', 'out_file')]),
 			(f_warp, blur, [('output_image', 'in_file')]),
 			(blur, datasink, [('out_file', 'func')]),
-			])
-	# if model_prediction_mask == False AND functional_blur_xy == False:
+		])
 	else:
 		workflow_connections.extend([
-			(get_f_scan, f_warp, [('nii_name','output_image')]),
+			(get_f_scan, f_warp, [('nii_name', 'output_image')]),
 			(f_warp, datasink, [('output_image', 'func')]),
-			])
+		])
 
 
 	workflow_config = {'execution': {'crashdump_dir': path.join(out_base,'crashdump'),}}
@@ -637,7 +627,8 @@ def generic(bids_base, template,
 	workflow.base_dir = out_base
 	workflow.config = workflow_config
 	try:
-		workflow.write_graph(dotfilename=path.join(workflow.base_dir,workdir_name,"graph.dot"), graph2use="hierarchical", format="png")
+		workflow.write_graph(dotfilename=path.join(workflow.base_dir,workdir_name,"graph.dot"), graph2use="flat", format="png")
+
 	except OSError:
 		print('We could not write the DOT file for visualization (`dot` function from the graphviz package). This is non-critical to the processing, but you should get this fixed.')
 
