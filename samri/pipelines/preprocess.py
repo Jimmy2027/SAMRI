@@ -476,10 +476,23 @@ def generic(bids_base, template,
 				(s_warp, datasink, [('output_image', 'anat')]),
 				])
 
-		workflow_connections.extend([
-			(get_f_scan, get_s_scan, [('subject_session', 'selector')]),
-			(get_s_scan, s_warp, [('nii_name','output_image')]),
-			(get_s_scan, s_biascorrect, [('nii_path', 'input_image')]),
+		if model_prediction_mask == True:
+			from samri.masking.predict_mask import predict_mask
+			masked_image = pe.Node(name='masked_image', interface=util.Function(function=predict_mask, input_names=
+			inspect.getargspec(predict_mask)[0], output_names=['out_file']))
+
+			workflow_connections.extend([
+				(get_f_scan, get_s_scan, [('subject_session', 'selector')]),
+				(get_s_scan, s_warp, [('nii_name', 'output_image')]),
+				(get_s_scan, masked_image, [('nii_path', 'in_file')]),
+				(masked_image, s_biascorrect, [('out_file', 'input_image')]),
+			])
+
+		else:
+			workflow_connections.extend([
+				(get_f_scan, get_s_scan, [('subject_session', 'selector')]),
+				(get_s_scan, s_warp, [('nii_name', 'output_image')]),
+				(get_s_scan, s_biascorrect, [('nii_path', 'input_image')]),
 			])
 
 	if functional_registration_method == "structural":
