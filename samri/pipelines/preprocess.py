@@ -470,31 +470,33 @@ def generic(bids_base, template,
 				(s_rotated, s_register, [('out_file', 'moving_image')]),
 				])
 		else:
-			workflow_connections.extend([
-				(s_biascorrect, s_register, [('output_image', 'moving_image')]),
-				(s_register, s_warp, [('composite_transform', 'transforms')]),
-				(get_s_scan, s_warp, [('nii_path', 'input_image')]),
-				(s_warp, datasink, [('output_image', 'anat')]),
-				])
+			if model_prediction_mask == True:
+				from samri.masking.predict_mask import predict_mask
+				masked_image = pe.Node(name='masked_image', interface=util.Function(function=predict_mask, input_names=
+				inspect.getargspec(predict_mask)[0], output_names=['out_file']))
 
-		if model_prediction_mask == True:
-			from samri.masking.predict_mask import predict_mask
-			masked_image = pe.Node(name='masked_image', interface=util.Function(function=predict_mask, input_names=
-			inspect.getargspec(predict_mask)[0], output_names=['out_file']))
+				workflow_connections.extend([
+					(s_biascorrect, masked_image, [('output_image', 'in_file')]),
+					(masked_image, s_register, [('output_image', 'moving_image')]),
+					(s_register, s_warp, [('composite_transform', 'transforms')]),
+					(get_s_scan, s_warp, [('nii_path', 'input_image')]),
+					(s_warp, datasink, [('output_image', 'anat')]),
+					])
 
-			workflow_connections.extend([
-				(get_f_scan, get_s_scan, [('subject_session', 'selector')]),
-				(get_s_scan, s_warp, [('nii_name', 'output_image')]),
-				(get_s_scan, masked_image, [('nii_path', 'in_file')]),
-				(masked_image, s_biascorrect, [('out_file', 'input_image')]),
-			])
+			else:
+				workflow_connections.extend([
+					(s_biascorrect, s_register, [('output_image', 'moving_image')]),
+					(s_register, s_warp, [('composite_transform', 'transforms')]),
+					(get_s_scan, s_warp, [('nii_path', 'input_image')]),
+					(s_warp, datasink, [('output_image', 'anat')]),
+					])
 
-		else:
-			workflow_connections.extend([
-				(get_f_scan, get_s_scan, [('subject_session', 'selector')]),
-				(get_s_scan, s_warp, [('nii_name', 'output_image')]),
-				(get_s_scan, s_biascorrect, [('nii_path', 'input_image')]),
-			])
+
+		workflow_connections.extend([
+			(get_f_scan, get_s_scan, [('subject_session', 'selector')]),
+			(get_s_scan, s_warp, [('nii_name', 'output_image')]),
+			(get_s_scan, s_biascorrect, [('nii_path', 'input_image')]),
+		])
 
 	if functional_registration_method == "structural":
 		if not structural_scan_types.any():
@@ -524,26 +526,15 @@ def generic(bids_base, template,
 		temporal_mean = pe.Node(interface=fsl.MeanImage(), name="temporal_mean")
 
 		merge = pe.Node(util.Merge(2), name='merge')
-		if model_prediction_mask == True:
-			additional_biascorrect = additional_s_biascorrect()
-			workflow_connections.extend([
-				(temporal_mean, f_biascorrect, [('out_file', 'input_image')]),
-				(f_biascorrect, f_register, [('output_image', 'moving_image')]),
-				(get_s_scan, additional_biascorrect, [('nii_path', 'input_image')]),
-				(additional_biascorrect, f_register, [('output_image', 'fixed_image')]),
-				(s_register, merge, [('composite_transform', 'in1')]),
-				(f_register, merge, [('composite_transform', 'in2')]),
-				(merge, f_warp, [('out', 'transforms')]),
-				])
-		else:
-			workflow_connections.extend([
-				(temporal_mean, f_biascorrect, [('out_file', 'input_image')]),
-				(f_biascorrect, f_register, [('output_image', 'moving_image')]),
-				(s_biascorrect, f_register, [('output_image', 'fixed_image')]),
-				(s_register, merge, [('composite_transform', 'in1')]),
-				(f_register, merge, [('composite_transform', 'in2')]),
-				(merge, f_warp, [('out', 'transforms')]),
-				])
+
+		workflow_connections.extend([
+			(temporal_mean, f_biascorrect, [('out_file', 'input_image')]),
+			(f_biascorrect, f_register, [('output_image', 'moving_image')]),
+			(s_biascorrect, f_register, [('output_image', 'fixed_image')]),
+			(s_register, merge, [('composite_transform', 'in1')]),
+			(f_register, merge, [('composite_transform', 'in2')]),
+			(merge, f_warp, [('out', 'transforms')]),
+			])
 		if realign == "space":
 			workflow_connections.extend([
 				(realigner, temporal_mean, [('realigned_files', 'in_file')]),
