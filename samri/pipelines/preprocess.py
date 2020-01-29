@@ -321,6 +321,7 @@ def generic(bids_base, template,
 	params={},
 	phase_dictionary=GENERIC_PHASES,
 	enforce_dummy_scans=DUMMY_SCANS,
+	model_prediction_mask = False,
 	):
 	'''
 	Generic preprocessing and registration workflow for small animal data in BIDS format.
@@ -523,15 +524,26 @@ def generic(bids_base, template,
 		temporal_mean = pe.Node(interface=fsl.MeanImage(), name="temporal_mean")
 
 		merge = pe.Node(util.Merge(2), name='merge')
-
-		workflow_connections.extend([
-			(temporal_mean, f_biascorrect, [('out_file', 'input_image')]),
-			(f_biascorrect, f_register, [('output_image', 'moving_image')]),
-			(s_biascorrect, f_register, [('output_image', 'fixed_image')]),
-			(s_register, merge, [('composite_transform', 'in1')]),
-			(f_register, merge, [('composite_transform', 'in2')]),
-			(merge, f_warp, [('out', 'transforms')]),
-			])
+		if model_prediction_mask == True:
+			additional_biascorrect = additional_s_biascorrect()
+			workflow_connections.extend([
+				(temporal_mean, f_biascorrect, [('out_file', 'input_image')]),
+				(f_biascorrect, f_register, [('output_image', 'moving_image')]),
+				(get_s_scan, additional_biascorrect, [('nii_path', 'input_image')]),
+				(additional_biascorrect, f_register, [('output_image', 'fixed_image')]),
+				(s_register, merge, [('composite_transform', 'in1')]),
+				(f_register, merge, [('composite_transform', 'in2')]),
+				(merge, f_warp, [('out', 'transforms')]),
+				])
+		else:
+			workflow_connections.extend([
+				(temporal_mean, f_biascorrect, [('out_file', 'input_image')]),
+				(f_biascorrect, f_register, [('output_image', 'moving_image')]),
+				(s_biascorrect, f_register, [('output_image', 'fixed_image')]),
+				(s_register, merge, [('composite_transform', 'in1')]),
+				(f_register, merge, [('composite_transform', 'in2')]),
+				(merge, f_warp, [('out', 'transforms')]),
+				])
 		if realign == "space":
 			workflow_connections.extend([
 				(realigner, temporal_mean, [('realigned_files', 'in_file')]),

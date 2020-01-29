@@ -67,6 +67,7 @@ def bids_autofind(bids_dir,
 
 	bids_dir = path.abspath(path.expanduser(bids_dir))
 
+
 	if match_regex:
 		pass
 	elif typ in ("func","dwi"):
@@ -181,7 +182,7 @@ def bids_substitution_iterator(sessions, subjects,
 			check_file = path.abspath(path.expanduser(check_file))
 			if path.isfile(check_file):
 				substitutions.append(substitution)
-			else: print('no file under path')
+			else: print('no file under path:', check_file)
 		else:
 			substitutions.append(substitution)
 	return substitutions
