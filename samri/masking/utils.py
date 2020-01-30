@@ -4,36 +4,61 @@ import os
 from matplotlib import pyplot as plt
 import scipy.ndimage
 
-def pad_img(img, shape):
-    """
-    Reshapes input image to shape. If input shape is bigger -> resize, if it is smaller -> zero-padd
-    :param img:
-    :param shape:
-    :return:
-    """
+# def pad_img(img, shape):
+#     """
+#     Reshapes input image to shape. If input shape is bigger -> resize, if it is smaller -> zero-padd
+#     :param img:
+#     :param shape:
+#     :return:
+#     """
+#
+#     padded = np.empty((img.shape[0], shape[0], shape[1]))
+#     padd_y = shape[0] - img.shape[1]
+#     padd_x = shape[1] - img.shape[2]
+#     for i in range(img.shape[0]):
+#         if padd_x < 0 and padd_y < 0:
+#             temp = cv2.resize(img[i], (shape[1], shape[0]))
+#             padded[i] = temp
+#         elif padd_y < 0:
+#             temp = cv2.resize(img[i], (img[i].shape[1], shape[0])) #cv2.resize takes shape in form (x,y)!
+#             print(temp.shape)
+#             something = np.empty((img.shape[0], shape[0], img.shape[2]))
+#             something[i] = temp
+#             padded[i, ...] = np.pad(something[i, ...], ((0,0), (padd_x // 2, shape[1] - padd_x // 2 - img.shape[2])), 'constant')
+#         elif padd_x < 0:
+#             temp = cv2.resize(img[i], (shape[1], img[i].shape[0]))
+#             padded[i] = np.pad(temp, ((padd_y//2, shape[0]-padd_y//2-img.shape[1]), (0,0)), 'constant')
+#         else:
+#             padded[i, ...] = np.pad(img[i, ...], ((padd_y//2, shape[0]-padd_y//2-img.shape[1]), (padd_x//2, shape[1]-padd_x//2-img.shape[2])), 'constant')
+#
+#     return padded
 
-    padded = np.empty((img.shape[0], shape[0], shape[1]))
+def pad_img(img, shape):
     padd_y = shape[0] - img.shape[1]
     padd_x = shape[1] - img.shape[2]
-    for i in range(img.shape[0]):
-        if padd_x < 0 and padd_y < 0:
+    padded = np.empty((img.shape[0], shape[0], shape[1]))
 
-            temp = cv2.resize(img[i], (shape[1], shape[0]))
-            padded[i] = temp
-        elif padd_y < 0:
-
-            temp = cv2.resize(img[i], (img[i].shape[1], shape[0])) #cv2.resize takes shape in form (x,y)!
-            something = np.empty((img.shape[0], shape[0], img.shape[2]))
-            something[i] = temp
-            padded[i, ...] = np.pad(something[i, ...], ((0,0), (padd_x // 2, shape[1] - padd_x // 2 - img.shape[2])), 'constant')
-        elif padd_x < 0:
-
-            temp = cv2.resize(img[i], (shape[1], img[i].shape[0]))
-            padded[i] = np.pad(temp, ((padd_y//2, shape[0]-padd_y//2-img.shape[1]), (0,0)), 'constant')
-        else:
+    if img.shape[1] < shape[0] and img.shape[2] < shape[1]:
+        for i in range(img.shape[0]):
             padded[i, ...] = np.pad(img[i, ...], ((padd_y//2, shape[0]-padd_y//2-img.shape[1]), (padd_x//2, shape[1]-padd_x//2-img.shape[2])), 'constant')
 
+    elif img.shape[1] > img.shape[2]:
+        for i in range(img.shape[0]):
+            padd = img.shape[1] - img.shape[2]
+            temp_padded = np.pad(img[i, ...], ((0,0), (padd // 2, img.shape[1] - padd // 2 - img.shape[2])), 'constant')
+            padded[i] = cv2.resize(temp_padded, (shape[1], shape[0]))
+
+    elif img.shape[1] < img.shape[2]:
+        for i in range(img.shape[0]):
+            padd = img.shape[2] - img.shape[1]
+            temp_padded = np.pad(img[i, ...], ((padd // 2, img.shape[2] - padd // 2 - img.shape[1]),(0,0)), 'constant')
+            padded[i] = cv2.resize(temp_padded, (shape[1], shape[0]))
+    else:
+        temp = cv2.resize(img[i], (shape[1], shape[0]))
+        padded[i] = temp
     return padded
+
+
 
 
 def preprocess(img, shape,slice_view, switched_axis = False):
