@@ -29,7 +29,7 @@ def predict_mask(in_file):
     prediction_shape = (64, 64)
     image = nib.load(in_file)
     in_file_data = image.get_data()
-    in_file_data = np.moveaxis(in_file_data, 1, 0)
+    in_file_data = np.moveaxis(in_file_data, 2, 0)
     ori_shape = in_file_data.shape
     delta_shape = tuple(np.subtract(prediction_shape, ori_shape[1:]))
 
@@ -47,7 +47,7 @@ def predict_mask(in_file):
         temp = np.expand_dims(temp, 0)  # expand dims for batch
         prediction = model.predict(temp, verbose = 0)
         prediction = np.squeeze(prediction)
-        mask_pred[slice, ...] = prediction
+        mask_pred[slice, ...] = np.where(prediction > 0.9, 1, 0)
 
 
     """
@@ -71,12 +71,9 @@ def predict_mask(in_file):
             resized_mask = slice[delta_shape[0]//2:ori_shape[1] + delta_shape[0]//2, delta_shape[1]//2:ori_shape[2] + delta_shape[1]//2]
             resized[i] = resized_mask
 
-    resized = np.moveaxis(resized, 1, 0)
-    masked_image = image.get_data()
-
-    masked_image[resized == 0] = 0
-
-
+    resized = np.moveaxis(resized, 0, 2)
+    original_image = image.get_data()
+    np.multiply(original_image, resized)
 
     nii_path = 'masked_image.nii.gz'
     nii_path = path.abspath(path.expanduser(nii_path))
