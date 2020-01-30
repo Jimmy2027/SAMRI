@@ -477,7 +477,7 @@ def generic(bids_base, template,
 
 				workflow_connections.extend([
 					(s_biascorrect, masked_image, [('output_image', 'in_file')]),
-					(masked_image, s_register, [('output_image', 'moving_image')]),
+					(masked_image, s_register, [('out_file', 'moving_image')]),
 					(s_register, s_warp, [('composite_transform', 'transforms')]),
 					(get_s_scan, s_warp, [('nii_path', 'input_image')]),
 					(s_warp, datasink, [('output_image', 'anat')]),
