@@ -38,11 +38,11 @@ def pad_img(img, shape):
     padd_x = shape[1] - img.shape[2]
     padded = np.empty((img.shape[0], shape[0], shape[1]))
 
-    if img.shape[1] < shape[0] and img.shape[2] < shape[1]:
-        for i in range(img.shape[0]):
-            padded[i, ...] = np.pad(img[i, ...], ((padd_y//2, shape[0]-padd_y//2-img.shape[1]), (padd_x//2, shape[1]-padd_x//2-img.shape[2])), 'constant')
+    # if img.shape[1] < shape[0] and img.shape[2] < shape[1]:
+    #     for i in range(img.shape[0]):
+    #         padded[i, ...] = np.pad(img[i, ...], ((padd_y//2, shape[0]-padd_y//2-img.shape[1]), (padd_x//2, shape[1]-padd_x//2-img.shape[2])), 'constant')
 
-    elif img.shape[1] > img.shape[2]:
+    if img.shape[1] > img.shape[2]:
         for i in range(img.shape[0]):
             padd = img.shape[1] - img.shape[2]
             temp_padded = np.pad(img[i, ...], ((0,0), (padd // 2, img.shape[1] - padd // 2 - img.shape[2])), 'constant')
