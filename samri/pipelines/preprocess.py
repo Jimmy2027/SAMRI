@@ -321,6 +321,7 @@ def generic(bids_base, template,
 	params={},
 	phase_dictionary=GENERIC_PHASES,
 	enforce_dummy_scans=DUMMY_SCANS,
+	model_prediction_mask = False,
 	):
 	'''
 	Generic preprocessing and registration workflow for small animal data in BIDS format.
@@ -458,7 +459,7 @@ def generic(bids_base, template,
 		get_s_scan.inputs.bids_base = bids_base
 
 		s_register, s_warp, f_register, f_warp = generic_registration(template,
-			structural_mask=registration_mask,
+			template_mask=registration_mask,
 			phase_dictionary=phase_dictionary,
 			)
 		#TODO: incl. in func registration
@@ -476,10 +477,27 @@ def generic(bids_base, template,
 				(s_warp, datasink, [('output_image', 'anat')]),
 				])
 
-		workflow_connections.extend([
-			(get_f_scan, get_s_scan, [('subject_session', 'selector')]),
-			(get_s_scan, s_warp, [('nii_name','output_image')]),
-			(get_s_scan, s_biascorrect, [('nii_path', 'input_image')]),
+		if model_prediction_mask == True:
+			from samri.masking.predict_mask import predict_mask
+			# masked_image = pe.Node(name='masked_image', interface=util.Function(function=predict_mask, input_names=
+			# inspect.getargspec(predict_mask)[0], output_names=['out_file', 'mask']))
+			masked_image = pe.Node(name='masked_image', interface=util.Function(function=predict_mask, input_names=
+			inspect.getargspec(predict_mask)[0], output_names=['out_file']))
+
+			workflow_connections.extend([
+				(get_f_scan, get_s_scan, [('subject_session', 'selector')]),
+				(get_s_scan, s_warp, [('nii_name', 'output_image')]),
+				(get_s_scan, masked_image, [('nii_path', 'in_file')]),
+				(masked_image, s_biascorrect, [('out_file', 'input_image')]),
+				# (masked_image, s_register, [('mask', 'moving_image_masks')]),
+				# (masked_image, f_register, [('mask', 'fixed_image_masks')])
+			])
+
+		else:
+			workflow_connections.extend([
+				(get_f_scan, get_s_scan, [('subject_session', 'selector')]),
+				(get_s_scan, s_warp, [('nii_name', 'output_image')]),
+				(get_s_scan, s_biascorrect, [('nii_path', 'input_image')]),
 			])
 
 	if functional_registration_method == "structural":
@@ -510,15 +528,26 @@ def generic(bids_base, template,
 		temporal_mean = pe.Node(interface=fsl.MeanImage(), name="temporal_mean")
 
 		merge = pe.Node(util.Merge(2), name='merge')
-
-		workflow_connections.extend([
-			(temporal_mean, f_biascorrect, [('out_file', 'input_image')]),
-			(f_biascorrect, f_register, [('output_image', 'moving_image')]),
-			(s_biascorrect, f_register, [('output_image', 'fixed_image')]),
-			(s_register, merge, [('composite_transform', 'in1')]),
-			(f_register, merge, [('composite_transform', 'in2')]),
-			(merge, f_warp, [('out', 'transforms')]),
-			])
+		if model_prediction_mask == True:
+			additional_biascorrect = additional_s_biascorrect()
+			workflow_connections.extend([
+				(temporal_mean, f_biascorrect, [('out_file', 'input_image')]),
+				(f_biascorrect, f_register, [('output_image', 'moving_image')]),
+				(get_s_scan, additional_biascorrect, [('nii_path', 'input_image')]),
+				(additional_biascorrect, f_register, [('output_image', 'fixed_image')]),
+				(s_register, merge, [('composite_transform', 'in1')]),
+				(f_register, merge, [('composite_transform', 'in2')]),
+				(merge, f_warp, [('out', 'transforms')]),
+				])
+		else:
+			workflow_connections.extend([
+				(temporal_mean, f_biascorrect, [('out_file', 'input_image')]),
+				(f_biascorrect, f_register, [('output_image', 'moving_image')]),
+				(s_biascorrect, f_register, [('output_image', 'fixed_image')]),
+				(s_register, merge, [('composite_transform', 'in1')]),
+				(f_register, merge, [('composite_transform', 'in2')]),
+				(merge, f_warp, [('out', 'transforms')]),
+				])
 		if realign == "space":
 			workflow_connections.extend([
 				(realigner, temporal_mean, [('realigned_files', 'in_file')]),

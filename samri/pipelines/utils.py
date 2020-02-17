@@ -200,6 +200,7 @@ def bids_data_selection(base, structural_match, functional_match, subjects, sess
 	# drop event files
 	df = df[df.type != 'events']
 
+
 	# rm .json
 	df = df.loc[df.path.str.contains('.nii')]
 
@@ -221,6 +222,7 @@ def bids_data_selection(base, structural_match, functional_match, subjects, sess
 	# Unclear in current BIDS specification, we refer to BOLD/CBV as modalities and func/anat as types
 	df = df.rename(columns={'modality': 'type', 'type': 'modality'})
 
+
 	#TODO: The following should be collapsed into one criterion category
 	if functional_match or structural_match:
 		res_df = pd.DataFrame()
@@ -229,6 +231,7 @@ def bids_data_selection(base, structural_match, functional_match, subjects, sess
 			try:
 				if joint_conditions:
 					for match in functional_match.keys():
+
 						_df = _df.loc[_df[match].isin(functional_match[match])]
 					res_df = res_df.append(_df)
 				else:
@@ -237,6 +240,7 @@ def bids_data_selection(base, structural_match, functional_match, subjects, sess
 						res_df = res_df.append(_df)
 			except:
 				pass
+
 		if structural_match:
 			_df = deepcopy(df)
 			try:
