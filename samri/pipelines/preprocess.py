@@ -459,7 +459,7 @@ def generic(bids_base, template,
 		get_s_scan.inputs.bids_base = bids_base
 
 		s_register, s_warp, f_register, f_warp = generic_registration(template,
-			structural_mask=registration_mask,
+			template_mask=registration_mask,
 			phase_dictionary=phase_dictionary,
 			)
 		#TODO: incl. in func registration
@@ -479,6 +479,8 @@ def generic(bids_base, template,
 
 		if model_prediction_mask == True:
 			from samri.masking.predict_mask import predict_mask
+			# masked_image = pe.Node(name='masked_image', interface=util.Function(function=predict_mask, input_names=
+			# inspect.getargspec(predict_mask)[0], output_names=['out_file', 'mask']))
 			masked_image = pe.Node(name='masked_image', interface=util.Function(function=predict_mask, input_names=
 			inspect.getargspec(predict_mask)[0], output_names=['out_file']))
 
@@ -487,6 +489,8 @@ def generic(bids_base, template,
 				(get_s_scan, s_warp, [('nii_name', 'output_image')]),
 				(get_s_scan, masked_image, [('nii_path', 'in_file')]),
 				(masked_image, s_biascorrect, [('out_file', 'input_image')]),
+				# (masked_image, s_register, [('mask', 'moving_image_masks')]),
+				# (masked_image, f_register, [('mask', 'fixed_image_masks')])
 			])
 
 		else:

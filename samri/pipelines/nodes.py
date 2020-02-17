@@ -70,8 +70,7 @@ def structural_registration(template, num_threads=4):
 	return registration, s_warp, f_warp
 
 def generic_registration(template,
-	structural_mask='/usr/share/mouse-brain-atlases/dsurqec_200micron_mask.nii',
-	functional_mask='',
+	template_mask='/usr/share/mouse-brain-atlases/dsurqec_200micron_mask.nii',
 	num_threads=4,
 	phase_dictionary=GENERIC_PHASES,
 	s_phases=['s_translation','similarity','affine','syn'],
@@ -108,8 +107,8 @@ def generic_registration(template,
 	s_registration.inputs.winsorize_lower_quantile = 0.005
 	s_registration.inputs.winsorize_upper_quantile = 0.995
 	s_registration.inputs.args = '--float'
-	if structural_mask:
-		s_registration.inputs.fixed_image_masks = [path.abspath(path.expanduser(structural_mask))]
+	if template_mask:
+		s_registration.inputs.fixed_image_masks = [path.abspath(path.expanduser(template_mask))]
 	s_registration.inputs.num_threads = num_threads
 
 	f_parameters = [phase_dictionary[selection] for selection in f_phases]
@@ -139,8 +138,6 @@ def generic_registration(template,
 	f_registration.inputs.winsorize_lower_quantile = 0.05
 	f_registration.inputs.winsorize_upper_quantile = 0.95
 	f_registration.inputs.args = '--float'
-	if functional_mask:
-		f_registration.inputs.fixed_image_masks = [path.abspath(path.expanduser(functional_mask))]
 	f_registration.inputs.num_threads = num_threads
 
 
@@ -202,7 +199,7 @@ def functional_registration(template,
 	f_registration.inputs.winsorize_upper_quantile = 0.95
 	f_registration.inputs.args = '--float'
 	if mask:
-		f_registration.inputs.fixed_image_masks = [path.abspath(path.expanduser(mask))]
+		f_registration.inputs.fixed_image_mask = [path.abspath(path.expanduser(mask))]
 	f_registration.inputs.num_threads = num_threads
 
 	warp = pe.Node(ants.ApplyTransforms(), name="f_warp")
