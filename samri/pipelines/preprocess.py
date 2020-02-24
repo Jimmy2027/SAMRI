@@ -374,7 +374,7 @@ def generic(bids_base, template,
 	workflow_name : str, optional
 		Top level name for the output directory.
 	'''
-
+	print('\n\n\n\n\n\n', model_prediction_mask, '\n\n\n\n\n\n')
 	bids_base, out_base, out_dir, template, registration_mask, data_selection, functional_scan_types, structural_scan_types, subjects_sessions, func_ind, struct_ind = common_select(
 			bids_base,
 			out_base,
@@ -479,7 +479,8 @@ def generic(bids_base, template,
 				])
 
 		if model_prediction_mask == True:
-			from samri.masking.predict_mask import predict_mask
+			# from samri.masking.predict_mask import predict_mask
+			from MLEBE.masking import predict_mask
 			s_mask = pe.Node(name='s_mask', interface=util.Function(function=predict_mask, input_names=
 			inspect.getargspec(predict_mask)[0], output_names=['out_file', 'mask_list', 'mask']))
 			f_mask = pe.Node(name='f_mask', interface=util.Function(function=predict_mask, input_names= inspect.getargspec(predict_mask)[0], output_names=['mask']))
