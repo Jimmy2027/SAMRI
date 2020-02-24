@@ -199,7 +199,7 @@ def functional_registration(template,
 	f_registration.inputs.winsorize_upper_quantile = 0.95
 	f_registration.inputs.args = '--float'
 	if mask:
-		f_registration.inputs.fixed_image_mask = [path.abspath(path.expanduser(mask))]
+		f_registration.inputs.fixed_image_masks = [path.abspath(path.expanduser(mask))]
 	f_registration.inputs.num_threads = num_threads
 
 	warp = pe.Node(ants.ApplyTransforms(), name="f_warp")
@@ -257,5 +257,6 @@ def inflated_size_nodes():
 	f_biascorrect.inputs.shrink_factor = 2
 	f_biascorrect.inputs.n_iterations = [200,200,200,200]
 	f_biascorrect.inputs.convergence_threshold = 1e-11
+	f_biascorrect.inputs.mask = mask
 
 	return s_biascorrect, f_biascorrect

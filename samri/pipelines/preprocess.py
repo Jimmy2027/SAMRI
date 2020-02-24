@@ -277,7 +277,8 @@ def legacy(bids_base, template,
 	workflow.base_dir = out_base
 	workflow.config = workflow_config
 	try:
-		workflow.write_graph(dotfilename=path.join(workflow.base_dir,workdir_name,"graph.dot"), graph2use="hierarchical", format="png")
+		workflow.write_graph(dotfilename=path.join(workflow.base_dir, workdir_name, "graph.dot"), graph2use="hierarchical", format="png")
+
 	except OSError:
 		print('We could not write the DOT file for visualization (`dot` function from the graphviz package). This is non-critical to the processing, but you should get this fixed.')
 
@@ -419,7 +420,7 @@ def generic(bids_base, template,
 		(find_physio, datasink, [('physiofile', 'func.@physio')]),
 		(find_physio, datasink, [('meta_physiofile', 'func.@meta_physio')]),
 		(get_f_scan, events_file, [('events_name', 'out_file')]),
-		(get_f_scan, datasink, [(('subject_session',ss_to_path), 'container')]),
+		(get_f_scan, datasink, [(('subject_session', ss_to_path), 'container')]),
 		]
 
 	if realign == "space":
@@ -479,18 +480,20 @@ def generic(bids_base, template,
 
 		if model_prediction_mask == True:
 			from samri.masking.predict_mask import predict_mask
-			# masked_image = pe.Node(name='masked_image', interface=util.Function(function=predict_mask, input_names=
-			# inspect.getargspec(predict_mask)[0], output_names=['out_file', 'mask']))
-			masked_image = pe.Node(name='masked_image', interface=util.Function(function=predict_mask, input_names=
-			inspect.getargspec(predict_mask)[0], output_names=['out_file']))
-
+			s_mask = pe.Node(name='s_mask', interface=util.Function(function=predict_mask, input_names=
+			inspect.getargspec(predict_mask)[0], output_names=['out_file', 'mask_list', 'mask']))
+			f_mask = pe.Node(name='f_mask', interface=util.Function(function=predict_mask, input_names= inspect.getargspec(predict_mask)[0], output_names=['mask']))
+			f_mask.inputs.input_type = 'func'
 			workflow_connections.extend([
 				(get_f_scan, get_s_scan, [('subject_session', 'selector')]),
+				(get_f_scan, f_mask, [('nii_path', 'in_file')]),
+				(f_mask, f_biascorrect, [('mask', 'mask_image')]),
 				(get_s_scan, s_warp, [('nii_name', 'output_image')]),
-				(get_s_scan, masked_image, [('nii_path', 'in_file')]),
-				(masked_image, s_biascorrect, [('out_file', 'input_image')]),
-				# (masked_image, s_register, [('mask', 'moving_image_masks')]),
-				# (masked_image, f_register, [('mask', 'fixed_image_masks')])
+				(get_s_scan, s_mask, [('nii_path', 'in_file')]),
+				(s_mask, s_biascorrect, [('out_file', 'input_image')]),
+				(s_mask, s_biascorrect, [('mask', 'mask_image')]),
+				(s_mask, s_register, [('mask_list', 'moving_image_masks')]),
+				(s_mask, f_register, [('mask_list', 'fixed_image_masks')]),
 			])
 
 		else:
@@ -643,6 +646,7 @@ def generic(bids_base, template,
 	workflow.config = workflow_config
 	try:
 		workflow.write_graph(dotfilename=path.join(workflow.base_dir,workdir_name,"graph.dot"), graph2use="hierarchical", format="png")
+		workflow.write_graph(dotfilename=path.join(workflow.base_dir,workdir_name,"graph_flat.dot"), graph2use="flat", format="png")
 	except OSError:
 		print('We could not write the DOT file for visualization (`dot` function from the graphviz package). This is non-critical to the processing, but you should get this fixed.')
 
