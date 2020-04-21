@@ -644,7 +644,6 @@ def get_bids_scan(data_selection,
 	from samri.pipelines.utils import bids_naming
 
 	filtered_data = []
-
 	if selector:
 		subject = selector[0]
 		session = selector[1]

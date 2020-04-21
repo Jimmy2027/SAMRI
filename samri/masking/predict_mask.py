@@ -29,7 +29,6 @@ def predict_mask(in_file, input_type = 'anat'):
         from scipy import ndimage
         from skimage.morphology import watershed
         import os
-        from matplotlib import pyplot as plt
         markers = ndimage.label(image)[0]
         if len(np.unique(markers)) > 2:
             if not os.path.exists(path.abspath(path.expanduser('classifier/'))):
@@ -76,7 +75,6 @@ def predict_mask(in_file, input_type = 'anat'):
         mask_pred[slice, ...] = np.where(prediction > 0.9, 1, 0)
 
     mask_pred = remove_outliers(mask_pred)
-
     """
     Reconstruct to original image size
     """
@@ -127,6 +125,6 @@ def predict_mask(in_file, input_type = 'anat'):
         nib.save(masked_image, nii_path_masked)
 
     if input_type == 'func':
-        return resampled_mask_path
+        return [resampled_mask_path], resampled_mask_path
     else:
         return nii_path_masked, [resampled_mask_path], resampled_mask_path  #f/s_biascorrect takes a list as input for the mask while biascorrect takes dierectly the path

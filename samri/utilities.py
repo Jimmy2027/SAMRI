@@ -128,6 +128,7 @@ def bids_substitution_iterator(sessions, subjects,
 	l1_workdir=None,
 	preprocessing_workdir=None,
 	validate_for_template=None,
+	verbose = False,
 	):
 	"""Returns a list of dictionaries, which can be used together with a template string to identify large sets of input data files for SAMRI functions.
 
@@ -158,7 +159,7 @@ def bids_substitution_iterator(sessions, subjects,
 	Returns
 	-------
 	list of dictionaries
-		With the keys being `"data_dir"`, `"subject"`, `"session"`, `"task"`!!!.
+		With the keys being `"data_dir"`, `"subject"`, `"session"`, `"task"`.
 	"""
 	substitutions=[]
 	subjects = list(dict.fromkeys(subjects))
@@ -182,7 +183,9 @@ def bids_substitution_iterator(sessions, subjects,
 			check_file = path.abspath(path.expanduser(check_file))
 			if path.isfile(check_file):
 				substitutions.append(substitution)
-			else: print('no file under path:', check_file)
+			else:
+				if verbose == True:
+					print('no file under path:', check_file)
 		else:
 			substitutions.append(substitution)
 	return substitutions

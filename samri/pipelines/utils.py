@@ -189,7 +189,6 @@ def bids_data_selection(base, structural_match, functional_match, subjects, sess
 				print("Detected!")
 	layout = BIDSLayout(base)
 	df = layout.as_data_frame()
-
 	# Not crashing if the run field is not present
 	try:
 		# Run is for some reason recorded as float
@@ -206,7 +205,6 @@ def bids_data_selection(base, structural_match, functional_match, subjects, sess
 
 	# generate scan types for later
 	df['scan_type'] = ""
-
 	#print(df.path.str.startswith('task', beg=0,end=len('task')))
 	beg = df.path.str.find('task-')
 	end = df.path.str.find('.')
@@ -218,11 +216,8 @@ def bids_data_selection(base, structural_match, functional_match, subjects, sess
 		df.loc[df.modality == 'func', 'scan_type'] = 'task-' + df['task'] + '_acq-'+ df['acq']
 	if 'anat' in df.columns:
 		df.loc[df.modality == 'anat', 'scan_type'] = 'acq-'+df['acq'] +'_' + df['type']
-
 	# Unclear in current BIDS specification, we refer to BOLD/CBV as modalities and func/anat as types
 	df = df.rename(columns={'modality': 'type', 'type': 'modality'})
-
-
 	#TODO: The following should be collapsed into one criterion category
 	if functional_match or structural_match:
 		res_df = pd.DataFrame()
@@ -231,14 +226,14 @@ def bids_data_selection(base, structural_match, functional_match, subjects, sess
 			try:
 				if joint_conditions:
 					for match in functional_match.keys():
-
 						_df = _df.loc[_df[match].isin(functional_match[match])]
 					res_df = res_df.append(_df)
 				else:
 					for match in structural_match.keys():
 						_df = filter_data(_df, match, functional_match[match])
 						res_df = res_df.append(_df)
-			except:
+			except Exception as e:
+				print(e)
 				pass
 
 		if structural_match:
@@ -252,10 +247,10 @@ def bids_data_selection(base, structural_match, functional_match, subjects, sess
 					for match in structural_match.keys():
 						_df = filter_data(_df, match, structural_match[match])
 						res_df = res_df.append(_df)
-			except:
+			except Exception as e:
+				print(e)
 				pass
 		df = res_df
-
 	if subjects:
 		df = filter_data(df, 'subject', subjects)
 	if sessions:

@@ -323,6 +323,7 @@ def generic(bids_base, template,
 	phase_dictionary=GENERIC_PHASES,
 	enforce_dummy_scans=DUMMY_SCANS,
 	model_prediction_mask = False,
+	classifier_paths = ['','']
 	):
 	'''
 	Generic preprocessing and registration workflow for small animal data in BIDS format.
@@ -374,7 +375,6 @@ def generic(bids_base, template,
 	workflow_name : str, optional
 		Top level name for the output directory.
 	'''
-	print('\n\n\n\n\n\n', model_prediction_mask, '\n\n\n\n\n\n')
 	bids_base, out_base, out_dir, template, registration_mask, data_selection, functional_scan_types, structural_scan_types, subjects_sessions, func_ind, struct_ind = common_select(
 			bids_base,
 			out_base,
@@ -386,10 +386,8 @@ def generic(bids_base, template,
 			subjects,
 			sessions,
 			)
-
 	if not n_jobs:
 		n_jobs = max(int(round(mp.cpu_count()*n_jobs_percentage)),2)
-
 	find_physio = pe.Node(name='find_physio', interface=util.Function(function=corresponding_physiofile,input_names=inspect.getargspec(corresponding_physiofile)[0], output_names=['physiofile','meta_physiofile']))
 
 	get_f_scan = pe.Node(name='get_f_scan', interface=util.Function(function=get_bids_scan,input_names=inspect.getargspec(get_bids_scan)[0], output_names=['scan_path','scan_type','task', 'nii_path', 'nii_name', 'events_name', 'subject_session', 'metadata_filename', 'dict_slice', 'ind_type']))
@@ -479,12 +477,15 @@ def generic(bids_base, template,
 				])
 
 		if model_prediction_mask == True:
-			# from samri.masking.predict_mask import predict_mask
-			from MLEBE.masking import predict_mask
+			from mlebe.masking.predict_mask import predict_mask
 			s_mask = pe.Node(name='s_mask', interface=util.Function(function=predict_mask, input_names=
 			inspect.getargspec(predict_mask)[0], output_names=['out_file', 'mask_list', 'mask']))
-			f_mask = pe.Node(name='f_mask', interface=util.Function(function=predict_mask, input_names= inspect.getargspec(predict_mask)[0], output_names=['mask']))
+			f_mask = pe.Node(name='f_mask', interface=util.Function(function=predict_mask, input_names= inspect.getargspec(predict_mask)[0], output_names=['out_file','mask_list','mask']))
+			s_mask.inputs.bias_correct_bool = True
+			s_mask.inputs.anat_model_path = classifier_paths[0]
+			f_mask.inputs.bias_correct_bool = True
 			f_mask.inputs.input_type = 'func'
+			f_mask.inputs.func_model_path = classifier_paths[1]
 			workflow_connections.extend([
 				(get_f_scan, get_s_scan, [('subject_session', 'selector')]),
 				(get_f_scan, f_mask, [('nii_path', 'in_file')]),
@@ -494,7 +495,7 @@ def generic(bids_base, template,
 				(s_mask, s_biascorrect, [('out_file', 'input_image')]),
 				(s_mask, s_biascorrect, [('mask', 'mask_image')]),
 				(s_mask, s_register, [('mask_list', 'moving_image_masks')]),
-				(s_mask, f_register, [('mask_list', 'fixed_image_masks')]),
+				(f_mask, f_register, [('mask_list', 'moving_image_masks')]),
 			])
 
 		else:
@@ -694,13 +695,11 @@ def common_select(bids_base, out_base, workflow_name, template, registration_mas
 	else:
 		out_base = path.abspath(path.expanduser(out_base))
 	out_dir = path.join(out_base,workflow_name)
-
 	data_selection = bids_data_selection(bids_base, structural_match, functional_match, subjects, sessions)
 	workdir = out_dir + '_work'
 	if not os.path.exists(workdir):
 		os.makedirs(workdir)
 	data_selection.to_csv(path.join(workdir,'data_selection.csv'))
-
 	# generate functional and structural scan types
 	functional_scan_types = data_selection.loc[data_selection.type == 'func']['acq'].values
 	structural_scan_types = data_selection.loc[data_selection.type == 'anat']['acq'].values
