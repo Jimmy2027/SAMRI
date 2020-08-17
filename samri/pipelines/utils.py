@@ -4,8 +4,8 @@ from __future__ import print_function, division, unicode_literals, absolute_impo
 import csv
 import os
 import pandas as pd
-from bids.grabbids import BIDSLayout
-from bids.grabbids import BIDSValidator
+from bids import BIDSLayout
+from bids import BIDSValidator
 from copy import deepcopy
 from datetime import datetime
 

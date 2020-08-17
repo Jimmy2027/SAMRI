@@ -9,7 +9,7 @@ import shutil
 
 from copy import deepcopy
 import pandas as pd
-from bids.grabbids import BIDSLayout
+from bids import BIDSLayout
 
 BEST_GUESS_MODALITY_MATCH = {
 	('FLASH',):'T1w',

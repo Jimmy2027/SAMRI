@@ -532,11 +532,11 @@ def generic(bids_base, template,
             ])
 
         if model_prediction_mask:
-            from mlebe.masking import get_masking_func
-            s_mask = pe.Node(name='s_mask', interface=util.Function(function=get_masking_func, input_names=
-            inspect.getargspec(get_masking_func)[0], output_names=['out_file', 'mask_list', 'mask']))
-            f_mask = pe.Node(name='f_mask', interface=util.Function(function=get_masking_func,
-                                                                    input_names=inspect.getargspec(get_masking_func)[0],
+            from mlebe.masking.predict_mask import predict_mask
+            s_mask = pe.Node(name='s_mask', interface=util.Function(function=predict_mask, input_names=
+            inspect.getargspec(predict_mask)[0], output_names=['out_file', 'mask_list', 'mask']))
+            f_mask = pe.Node(name='f_mask', interface=util.Function(function=predict_mask,
+                                                                    input_names=inspect.getargspec(predict_mask)[0],
                                                                     output_names=['out_file', 'mask_list', 'mask']))
             s_mask.inputs.workflow_config_path = masking_config_path
             f_mask.inputs.workflow_config_path = masking_config_path

@@ -1078,9 +1078,7 @@ def contour_slices(bg_image, file_template,
 		slices_number = data.shape[list(slice_row).index(max(slice_row))]
 		img_min_slice = slice_row[3] + subthreshold_start_slices*slice_thickness
 		img_max_slice = slice_row[3] + (slices_number-subthreshold_end_slices)*slice_thickness
-		print(img_max_slice, img_min_slice)
 		bounds.extend([img_min_slice,img_max_slice])
-		print(bounds)
 		if best_guess_negative:
 			slice_order_is_reversed += 1
 		else:
