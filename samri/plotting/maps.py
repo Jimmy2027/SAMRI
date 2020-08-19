@@ -40,7 +40,6 @@ def _draw_colorbar(stat_map_img, axes,
 	aspect=40,
 	fraction=0.025,
 	anchor=(10.0,0.5),
-	cut_coords=None,
 	positive_only=False,
 	negative_only=False,
 	cmap=None,
@@ -50,6 +49,62 @@ def _draw_colorbar(stat_map_img, axes,
 	panchor=(10.0, 0.5),
 	shrink=1.0,
 	):
+	"""Uses matplotlib's Colorbar class to plot a colorbar from stat_map_img and determine colorbar axes, limits, and the colormap for further plotting.
+
+	Parameters
+	----------
+
+	stat_map_img : string
+		Path to the image file to be used for colorbar plotting.
+	axes : matplotlib axis object
+		Used to generate child axes for colorbar plotting.
+	threshold : float (optional)
+		Threshold for normalizing the colorbar threshold.
+	nb_ticks : int (optional)
+		Determines the number of ticks in the colorbar axes.
+	edge_color : string (optional)
+		Determines the color of the colorbar border.
+	edge_alpha : int (optional)
+		Sets alpha color for color blending.
+	aspect : int (optional)
+		Sets the aspect ratio of the colorbar.
+	fraction : float (optional)
+		Fraction of original axes to use for the colorbar.
+	anchor : tuple (optional)
+		Anchor point on which to place the colorbar on the axes.
+	positive_only : bool (optional)
+		If True, only shows positive half of the colorbar.
+	negative_only : bool (optional)
+		If True, only shows negative half of the colorbar.
+	cmap : string or list (optional)
+		Determines the colormap which should be used.
+	really_draw : bool (optional)
+		Determines whether cbar_ax and p_ax will actually be drawn. None will be returned if False.
+	bypass_cmap : bool (optional)
+		If True, returns original cmap as colmap rather than the new calculated cmap.
+	pad : float (optional)
+		Fraction of original axes between colorbar and new image axes.
+	panchor : tuple (optional)
+		Anchor point of the colorbar parent axes.
+	shrink : float (optional)
+		Fraction by which to multiply the size of the colorbar.
+
+	Returns
+	-------
+
+	cbar_ax : matplotlib axis object
+		Axis to draw to.
+	p_ax : dict
+		Reduced keyword dictionary to be passed when creating colorbar instances.
+	vmin : int
+		Lower limit for the colormap.
+	vmax : int
+		Upper limit for the colormap.
+	colmap : matplotlib Colormap class
+		Smoothly-varying colormap
+	"""
+
+
 	if bypass_cmap:
 		bypass_cmap = cmap
 	if isinstance(stat_map_img, str):
@@ -63,7 +118,7 @@ def _draw_colorbar(stat_map_img, axes,
 	if cmap:
 		try:
 			cmap = plt.cm.get_cmap(cmap)
-		except TypeError:
+		except (TypeError, ValueError):
 			cmap = mcolors.LinearSegmentedColormap.from_list('SAMRI cmap from list', cmap*256, N=256)
 		colors = cmap(np.linspace(0,1,256))
 		if positive_only:
@@ -369,7 +424,6 @@ def stat(stat_maps,
 			aspect=30,
 			fraction=0.05,
 			anchor=(1.,0.5),
-			cut_coords = cut_coords,
 			positive_only = positive_only,
 			negative_only = negative_only,
 			cmap=cmap,
@@ -601,7 +655,7 @@ def _create_3Dplot(stat_maps,
 	else:
 		try:
 			cmap = plt.cm.get_cmap(cmap)
-		except TypeError:
+		except (TypeError, ValueError):
 			cmap = mcolors.LinearSegmentedColormap.from_list('SAMRI cmap from list', cmap*256, N=256)
 
 	col_plus = norm(threshold)
@@ -1455,7 +1509,6 @@ def slices(heatmap_image,
 			pad=0.05,
 			panchor=(10.0, 0.5),
 			shrink=0.99,
-			cut_coords = cut_coords,
 			positive_only = positive_only,
 			negative_only = negative_only,
 			cmap=cmap,

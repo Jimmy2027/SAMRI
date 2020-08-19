@@ -38,8 +38,11 @@ def bids_autofind_df(bids_dir,
 	substitutions : list of dicti
 		A substitution iterator usable as a standard SAMRI function input, which (together with `path_template`) unambiguoulsy identifies input files for analysis.
 	"""
-	if not os.path.exists(os.path.expanduser(bids_dir)):
-		raise Exception('path {} not found'.format(os.path.expanduser(bids_dir)))
+
+	bids_dir = path.abspath(path.expanduser(bids_dir))
+	if not os.path.exists(bids_dir):
+		print('{} path not found'.format(bids_dir))
+	else: print('{} path found'.format(bids_dir))
 
 	path_template, substitutions = bids_autofind(bids_dir, **kwargs)
 

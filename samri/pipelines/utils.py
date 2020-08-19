@@ -4,8 +4,15 @@ from __future__ import print_function, division, unicode_literals, absolute_impo
 import csv
 import os
 import pandas as pd
-from bids import BIDSLayout
-from bids import BIDSValidator
+# PyBIDS 0.6.5 and 0.10.2 compatibility
+try:
+	from bids.grabbids import BIDSLayout
+except ModuleNotFoundError:
+	from bids.layout import BIDSLayout
+try:
+	from bids.grabbids import BIDSValidator
+except ModuleNotFoundError:
+	from bids_validator import BIDSValidator
 from copy import deepcopy
 from datetime import datetime
 
@@ -179,6 +186,33 @@ def bids_data_selection(base, structural_match, functional_match, subjects, sess
 	verbose=False,
 	joint_conditions=True,
 	):
+	"""
+	Creates a Pandas Dataframe descriptor from a BIDS datapath, optionally filtering out conditions.
+
+	Parameters
+	----------
+
+	base : str
+		path specifying the root directory of the BIDS data
+	structural_match : dict or bool
+		Dictionary specifying a whitelist of BIDS field identifiers.
+		False if no whitelist is specified.
+	functional_match : dict or bool
+		Dictionary specifying a whitelist of BIDS field identifiers.
+		False if no whitelist is specified.
+	subjects: list or bool
+		A list of subjects which may be present in the 'subjects' column of the created Pandas DataFrame, 'df'.
+		False if user does not want to filter DataFrame by subjects.
+	sessions: list or bool
+		A list of session names which may be present in the 'sessions' column of the created Pandas DataFrame, 'df'.
+		False if user does not want to filter DataFrame by sessions.
+	
+	Returns
+	-------
+
+	df : pandas.DataFrame
+		A Pandas DataFrame with information corresponding to the whitelisted BIDS identifiers and optionally filtered by subjects and/or sessions.
+	"""
 	validate = BIDSValidator()
 	if verbose:
 		for x in os.walk(base):
@@ -188,7 +222,12 @@ def bids_data_selection(base, structural_match, functional_match, subjects, sess
 			else:
 				print("Detected!")
 	layout = BIDSLayout(base)
-	df = layout.as_data_frame()
+
+	try:
+		df = layout.as_data_frame()
+	except AttributeError:
+		df = layout.to_df()
+
 	# Not crashing if the run field is not present
 	try:
 		# Run is for some reason recorded as float
@@ -197,7 +236,13 @@ def bids_data_selection(base, structural_match, functional_match, subjects, sess
 		pass
 
 	# drop event files
-	df = df[df.type != 'events']
+	print(df)
+	print(df.columns)
+	# PyBIDS 0.6.5 and 0.10.2 compatibility
+	try:
+		df = df[df.type != 'events']
+	except AttributeError:
+		df = df[df.suffix != 'events']
 
 
 	# rm .json
@@ -217,6 +262,7 @@ def bids_data_selection(base, structural_match, functional_match, subjects, sess
 	if 'anat' in df.columns:
 		df.loc[df.modality == 'anat', 'scan_type'] = 'acq-'+df['acq'] +'_' + df['type']
 	# Unclear in current BIDS specification, we refer to BOLD/CBV as modalities and func/anat as types
+	# Can be removed after Pybids 0.10.2 migration
 	df = df.rename(columns={'modality': 'type', 'type': 'modality'})
 	#TODO: The following should be collapsed into one criterion category
 	if functional_match or structural_match:
@@ -305,7 +351,10 @@ def parse_paravision_date(pv_date):
 	"""
 	from datetime import datetime
 
-	pv_date, _ = pv_date.split('+')
+	try:
+		pv_date, _ = pv_date.rsplit('+',1)
+	except ValueError:
+		pv_date, _ = pv_date.rsplit('-',1)
 	pv_date += "000"
 	pv_date = datetime.strptime(pv_date, "%Y-%m-%dT%H:%M:%S,%f")
 	return pv_date
@@ -394,6 +443,16 @@ def ss_to_path(subject_session):
 	return "/".join([subject,session])
 
 def bids_dict_to_source(bids_dictionary, source_format):
+	"""Generate a string from the source format with inserted corresponding values from the given dictionary.
+
+	Parameters
+	----------
+
+	bids_dictionary : dict
+		A dictionary with keys that are BIDS identifiers.
+	source_format : str
+		A Python format string with identifiers which are keys of the bids_dictionary parameter.
+	"""
 	from os import path
 
 	source = source_format.format(**bids_dictionary)
