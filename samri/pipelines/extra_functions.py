@@ -979,7 +979,8 @@ def select_from_datafind_df(df,
 	):
 	"""
 	Function that selects values from a Pandas DataFrame.
-	
+	This is useful in the context of nipype workflows, where the function needs to be encapsulated in a node.
+
 	Parameters
 	----------
 
@@ -998,7 +999,7 @@ def select_from_datafind_df(df,
 
 	Returns
 	-------
-	
+
 	list or scalar
 	If list_output is True, the function will return a list of values corresponding to the output key.
 	Otherwise, the function will return a scalar value corresponding to the first element of the Dataframe (if failsafe = True) or the output_key.
@@ -1020,7 +1021,14 @@ def select_from_datafind_df(df,
 	if bids_dictionary_override:
 		for key in bids_dictionary_override:
 			if bids_dictionary_override[key] != '':
-				df=df[df[key]==bids_dictionary_override[key]]
+				try:
+					df=df[df[key]==bids_dictionary_override[key]]
+				except (KeyError, TypeError):
+					path_string = '{}-{}'.format(key, bids_dictionary_override[key])
+					#print(path_string)
+					#print(df.columns)
+					#print(df)
+					df=df[df['path'].str.contains(path_string)]
 
 	if list_output:
 		selection = df[output_key].tolist()

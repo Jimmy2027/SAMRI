@@ -206,7 +206,7 @@ def bids_data_selection(base, structural_match, functional_match, subjects, sess
 	sessions: list or bool
 		A list of session names which may be present in the 'sessions' column of the created Pandas DataFrame, 'df'.
 		False if user does not want to filter DataFrame by sessions.
-	
+
 	Returns
 	-------
 
@@ -221,8 +221,8 @@ def bids_data_selection(base, structural_match, functional_match, subjects, sess
 				print("Is not BIDS-formatted.")
 			else:
 				print("Detected!")
-	layout = BIDSLayout(base)
-
+	#layout = BIDSLayout(base, validate=False)
+	layout = BIDSLayout(base,validate=False,derivatives=True)
 	try:
 		df = layout.as_data_frame()
 	except AttributeError:
