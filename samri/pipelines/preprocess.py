@@ -499,7 +499,7 @@ def generic(bids_base, template,
 		get_s_scan.inputs.bids_base = bids_base
 
 		s_register, s_warp, f_register, f_warp = generic_registration(template,
-			structural_mask=registration_mask,
+			template_mask=registration_mask,
 			phase_dictionary=phase_dictionary,
 			)
 		#TODO: incl. in func registration
