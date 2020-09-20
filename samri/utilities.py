@@ -7,8 +7,15 @@ import pandas as pd
 from itertools import product
 from joblib import Parallel, delayed
 from os import path
-from bids.grabbids import BIDSLayout
-from bids.grabbids import BIDSValidator
+# PyBIDS 0.6.5 and 0.10.2 compatibility
+try:
+	from bids.grabbids import BIDSLayout
+except ModuleNotFoundError:
+	from bids.layout import BIDSLayout
+try:
+	from bids.grabbids import BIDSValidator
+except ModuleNotFoundError:
+	from bids_validator import BIDSValidator
 
 N_PROCS=max(mp.cpu_count()-2,2)
 
@@ -31,9 +38,11 @@ def bids_autofind_df(bids_dir,
 	substitutions : list of dicti
 		A substitution iterator usable as a standard SAMRI function input, which (together with `path_template`) unambiguoulsy identifies input files for analysis.
 	"""
+
+	bids_dir = path.abspath(path.expanduser(bids_dir))
 	if not os.path.exists(bids_dir):
-		print('path not found')
-	else: print('path found')
+		print('{} path not found'.format(bids_dir))
+	else: print('{} path found'.format(bids_dir))
 
 	path_template, substitutions = bids_autofind(bids_dir, **kwargs)
 
@@ -66,6 +75,7 @@ def bids_autofind(bids_dir,
 	"""
 
 	bids_dir = path.abspath(path.expanduser(bids_dir))
+
 
 	if match_regex:
 		pass
@@ -127,6 +137,7 @@ def bids_substitution_iterator(sessions, subjects,
 	l1_workdir=None,
 	preprocessing_workdir=None,
 	validate_for_template=None,
+	verbose = False,
 	):
 	"""Returns a list of dictionaries, which can be used together with a template string to identify large sets of input data files for SAMRI functions.
 
@@ -166,7 +177,7 @@ def bids_substitution_iterator(sessions, subjects,
 	runs = list(dict.fromkeys(runs))
 	acquisitions = list(dict.fromkeys(acquisitions))
 	modalities = list(dict.fromkeys(modalities))
-	
+
 	for subject, session, task, run, acquisition, modality in product(subjects, sessions, tasks, runs, acquisitions, modalities):
 		substitution={}
 		substitution["data_dir"] = data_dir
@@ -181,11 +192,12 @@ def bids_substitution_iterator(sessions, subjects,
 			check_file = path.abspath(path.expanduser(check_file))
 			if path.isfile(check_file):
 				substitutions.append(substitution)
-			else: print('no file under path')
+			else:
+				print('no file under path')
 		else:
 			substitutions.append(substitution)
 	return substitutions
-	
+
 def iter_collapse_by_path(in_files, out_files,
 	n_jobs=None,
 	n_jobs_percentage=0.75,

@@ -1,3 +1,42 @@
+def test_extract_volume():
+	from samri.pipelines.extra_functions import extract_volume
+	import nibabel as nii
+	import nibabel as nib
+
+	in_file = '/usr/share/samri_bidsdata/preprocessing/sub-4007/ses-ofM/func/sub-4007_ses-ofM_task-JogB_acq-EPIlowcov_run-0_bold.nii.gz'
+
+	out_file_name='test_extract_volume.nii.gz'
+	extract_volume(in_file,
+		volume=0,
+		axis=3,
+		out_file=out_file_name,
+		)
+	img = nib.load(out_file_name)
+	assert img.header['dim'][0] == 3
+
+def test_flip_if_needed():
+	import os
+	import pandas as pd
+	from samri.pipelines.extra_functions import flip_if_needed
+
+	nii_path = '/usr/share/samri_bidsdata/preprocessing/sub-4007/ses-ofM/anat/sub-4007_ses-ofM_acq-TurboRARElowcov_T2w.nii.gz'
+	data_selection = pd.DataFrame(
+			[
+				{'PV_position':'Prone'},
+				{'PV_position':'Supine'},
+			]
+		)
+
+	ind = 0
+	out_name = 'should_be_a_file.nii.gz'
+	flip_if_needed(data_selection, nii_path, ind, output_filename=out_name)
+	assert os.path.isfile(out_name)
+
+	ind = 1
+	out_name = 'should_not_be_a_file.nii.gz'
+	flip_if_needed(data_selection, nii_path, ind, output_filename=out_name)
+	assert not os.path.isfile(out_name)
+
 def test_physiofile_ts():
 	from samri.pipelines.extra_functions import physiofile_ts
 

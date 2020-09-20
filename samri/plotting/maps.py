@@ -23,7 +23,6 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from samri.fetch.local import roi_from_atlaslabel
 from samri.plotting.utilities import QUALITATIVE_COLORSET
 from samri.utilities import collapse
-from samri.plotting.create_mesh_featuremaps import create_mesh
 from samri.report.roi import from_img_threshold
 
 COLORS_PLUS = plt.cm.autumn(np.linspace(0., 1, 128))
@@ -41,7 +40,6 @@ def _draw_colorbar(stat_map_img, axes,
 	aspect=40,
 	fraction=0.025,
 	anchor=(10.0,0.5),
-	cut_coords=None,
 	positive_only=False,
 	negative_only=False,
 	cmap=None,
@@ -51,6 +49,62 @@ def _draw_colorbar(stat_map_img, axes,
 	panchor=(10.0, 0.5),
 	shrink=1.0,
 	):
+	"""Uses matplotlib's Colorbar class to plot a colorbar from stat_map_img and determine colorbar axes, limits, and the colormap for further plotting.
+
+	Parameters
+	----------
+
+	stat_map_img : string
+		Path to the image file to be used for colorbar plotting.
+	axes : matplotlib axis object
+		Used to generate child axes for colorbar plotting.
+	threshold : float (optional)
+		Threshold for normalizing the colorbar threshold.
+	nb_ticks : int (optional)
+		Determines the number of ticks in the colorbar axes.
+	edge_color : string (optional)
+		Determines the color of the colorbar border.
+	edge_alpha : int (optional)
+		Sets alpha color for color blending.
+	aspect : int (optional)
+		Sets the aspect ratio of the colorbar.
+	fraction : float (optional)
+		Fraction of original axes to use for the colorbar.
+	anchor : tuple (optional)
+		Anchor point on which to place the colorbar on the axes.
+	positive_only : bool (optional)
+		If True, only shows positive half of the colorbar.
+	negative_only : bool (optional)
+		If True, only shows negative half of the colorbar.
+	cmap : string or list (optional)
+		Determines the colormap which should be used.
+	really_draw : bool (optional)
+		Determines whether cbar_ax and p_ax will actually be drawn. None will be returned if False.
+	bypass_cmap : bool (optional)
+		If True, returns original cmap as colmap rather than the new calculated cmap.
+	pad : float (optional)
+		Fraction of original axes between colorbar and new image axes.
+	panchor : tuple (optional)
+		Anchor point of the colorbar parent axes.
+	shrink : float (optional)
+		Fraction by which to multiply the size of the colorbar.
+
+	Returns
+	-------
+
+	cbar_ax : matplotlib axis object
+		Axis to draw to.
+	p_ax : dict
+		Reduced keyword dictionary to be passed when creating colorbar instances.
+	vmin : int
+		Lower limit for the colormap.
+	vmax : int
+		Upper limit for the colormap.
+	colmap : matplotlib Colormap class
+		Smoothly-varying colormap
+	"""
+
+
 	if bypass_cmap:
 		bypass_cmap = cmap
 	if isinstance(stat_map_img, str):
@@ -64,7 +118,7 @@ def _draw_colorbar(stat_map_img, axes,
 	if cmap:
 		try:
 			cmap = plt.cm.get_cmap(cmap)
-		except TypeError:
+		except (TypeError, ValueError):
 			cmap = mcolors.LinearSegmentedColormap.from_list('SAMRI cmap from list', cmap*256, N=256)
 		colors = cmap(np.linspace(0,1,256))
 		if positive_only:
@@ -351,7 +405,7 @@ def stat(stat_maps,
 				colorbar=False,
 				).cut_coords
 		if not ax:
-			fig, ax = plt.subplots(facecolor='#eeeeee')
+			fig, ax = plt.subplots()
 		else:
 			fig = None
 
@@ -370,7 +424,6 @@ def stat(stat_maps,
 			aspect=30,
 			fraction=0.05,
 			anchor=(1.,0.5),
-			cut_coords = cut_coords,
 			positive_only = positive_only,
 			negative_only = negative_only,
 			cmap=cmap,
@@ -418,7 +471,7 @@ def stat(stat_maps,
 				#we use inverse floor division to get the ceiling
 				ncols = -(-len(stat_maps)//2)
 				#scale = scale/float(nrows)
-		fig, ax = plt.subplots(facecolor='#eeeeee', nrows=nrows, ncols=ncols)
+		fig, ax = plt.subplots(nrows=nrows, ncols=ncols)
 		#fig, ax = plt.subplots(figsize=(6*ncols,2.5*nrows), facecolor='#eeeeee', nrows=nrows, ncols=ncols)
 		if figure_title:
 			fig.suptitle(figure_title, fontsize=scale*35, fontweight='bold')
@@ -530,7 +583,8 @@ def stat(stat_maps,
 			conserve_colorbar_steps-=1
 	if save_as:
 		if isinstance(save_as, str):
-			plt.savefig(path.abspath(path.expanduser(save_as)), dpi=400, bbox_inches='tight')
+			my_dpi=rcParams['savefig.dpi']
+			plt.savefig(path.abspath(path.expanduser(save_as)), dpi=my_dpi, bbox_inches='tight')
 		else:
 			from matplotlib.backends.backend_pdf import PdfPages
 			if isinstance(save_as, PdfPages):
@@ -568,6 +622,8 @@ def _create_3Dplot(stat_maps,
 	vmax : int
 		max for colorbar range.
 	"""
+	# The following imports a lot of extra functions, and is only required for this function.
+	from samri.plotting.create_mesh_featuremaps import create_mesh
 
 	if isinstance(stat_maps, str):
 		stat_maps=[stat_maps]
@@ -599,7 +655,7 @@ def _create_3Dplot(stat_maps,
 	else:
 		try:
 			cmap = plt.cm.get_cmap(cmap)
-		except TypeError:
+		except (TypeError, ValueError):
 			cmap = mcolors.LinearSegmentedColormap.from_list('SAMRI cmap from list', cmap*256, N=256)
 
 	col_plus = norm(threshold)
@@ -665,7 +721,6 @@ def _create_3Dplot(stat_maps,
 
 
 def _plots_overlay(display,display_3Dplot):
-
 	"""Internal function which overlays the plot from stat() with the 3D plot
 
 	Parameters
@@ -678,17 +733,36 @@ def _plots_overlay(display,display_3Dplot):
 
 	"""
 
+	# Hackish fix for 3D image displacement when exporting to PGF.
+	# Somehow the bounding boxes in the PGF file are messed up leading to the figure being displaced partly or wholly out of the field of view.
+	# Originally documented on zenhost configuration (partial displacement), lately appeared across multiple configurations (total displacement).
+	# Can hopefully be deleted in the future.
+	import getpass
+	this_user = getpass.getuser()
+	dummy_output='/var/tmp/{}_samri_plot3d.png'.format(this_user)
+	plt.savefig(dummy_output)
+	try:
+		os.remove(dummy_output)
+	except FileNotFoundError:
+		pass
+
 	#get matplotlib figure from Nilearn.OrthoSlicer2 object
 	fh = display.frame_axes.get_figure()
 	fh.canvas.draw()
 
-	# Hackish fix for 3D image displacement on zenhost configuration !!!
-	#import getpass
-	#this_user = getpass.getuser()
-	#plt.savefig('/tmp/{}_tmp.png'.format(this_user))
-
 	#Determine correct location to put the plot in relation to existing figure axes
-	box = [max(display.axes['x'].ax.get_position().x0,display.axes['y'].ax.get_position().x0,display.axes['z'].ax.get_position().x0),min(display.axes['x'].ax.get_position().y0,display.axes['y'].ax.get_position().y0,display.axes['z'].ax.get_position().y0),display.axes['x'].ax.get_position().bounds[2],display.axes['z'].ax.get_position().bounds[3]]
+	box = [
+		max(display.axes['x'].ax.get_position().x0,
+			display.axes['y'].ax.get_position().x0,
+			display.axes['z'].ax.get_position().x0,
+			),
+		min(display.axes['x'].ax.get_position().y0,
+			display.axes['y'].ax.get_position().y0,
+			display.axes['z'].ax.get_position().y0,
+			),
+		display.axes['x'].ax.get_position().bounds[2],
+		display.axes['z'].ax.get_position().bounds[3],
+		]
 
 	#add new axes
 	ax_mesh = fh.add_axes(box)
@@ -832,7 +906,7 @@ def atlas_label(atlas,
 	color="#E69F00",
 	fig=None,
 	label_names=[],
-	mapping="",
+	mapping='/usr/share/mouse-brain-atlases/dsurqe_labels.csv',
 	annotate=True,
 	black_bg=False,
 	draw_cross=True,
@@ -1126,7 +1200,7 @@ def contour_slices(bg_image, file_template,
 					display.add_contours(img,
 							alpha=alpha[img_ix],
 							colors=[color],
-							levels=levels[img_ix],
+							levels=[levels[img_ix]],
 							linewidths=(linewidths[img_ix],),
 							)
 
@@ -1163,10 +1237,72 @@ def contour_slices(bg_image, file_template,
 			)
 		plt.close()
 
+def atlas_labels(
+	atlas='/usr/share/mouse-brain-atlases/dsurqec_40micron_labels.nii',
+	mapping='/usr/share/mouse-brain-atlases/dsurqe_labels.csv',
+	template='/usr/share/mouse-brain-atlases/dsurqec_40micron_masked.nii',
+	target_dir='/var/tmp/samri_atlas_labels',
+	structure_column='Structure',
+	label_column_l='left label',
+	label_column_r='right label',
+	file_format='png',
+	):
+	"""
+	Plot individual images for all of the labels in an atlas.
+
+	Parameters
+	----------
+
+	atlas : str, optional
+		Path to an atlas NIfTI file, containing integer values for all voxels.
+	mapping : str or pandas.DataFramr, optional
+		Path to mapping file in CSV format or Pandas Dataframe object, containing columns named according to the values of `structure_column`, `label_column_l`, and `label_column_r`.
+	template : str, optional
+		Path to template file in NIfTI format.
+	target_dir : str, optional
+		Path to directory to which image files will be saved.
+	structure_column : str, optional
+		A name of a column present in the `mapping` file, which contains the structure names.
+	label_column_l : str, optional
+		A name of a column present in the `mapping` file, which contains the integer which is used to denote the left lateralized structure in the `atlas` file.
+	label_column_r : str, optional
+		A name of a column present in the `mapping` file, which contains the integer which is used to denote the right lateralized structure in the `atlas` file.
+	file_format : {'png', 'pdf'}, optional
+		The format as which the image files should be saved.
+	"""
+
+
+	if not os.path.exists(target_dir):
+		os.makedirs(target_dir)
+
+	if isinstance(mapping, str):
+		mapping_df = pd.read_csv(mapping)
+	else:
+		mapping_df = mapping
+
+	for index, row in mapping_df.iterrows():
+		structure = row[structure_column]
+		left_label = row[label_column_l]
+		right_label = row[label_column_r]
+		if left_label == right_label:
+			structure_filename = structure.replace(" ", "_")
+			atlas_label(atlas, mapping=mapping, label_names=[structure], display_mode='ortho')
+			plt.savefig('{}/{}.{}'.format(target_dir,structure_filename,file_format))
+		else:
+			structure_filename = structure.replace(" ", "_")
+			structure_filename = structure.replace("/", "_")
+			structure_filename_l = '{}_l'.format(structure_filename)
+			atlas_label(atlas, mapping=mapping, label_names=[structure], laterality='left', display_mode='ortho')
+			plt.savefig('{}/{}.{}'.format(target_dir,structure_filename_l,file_format))
+			structure_filename_r = '{}_r'.format(structure_filename)
+			atlas_label(atlas, mapping=mapping, label_names=[structure], laterality='right', display_mode='ortho')
+			plt.savefig('{}/{}.{}'.format(target_dir,structure_filename_r,file_format))
+
 def slices(heatmap_image,
 	bg_image='/usr/share/mouse-brain-atlases/dsurqec_40micron_masked.nii',
 	contour_image='',
 	heatmap_threshold=3,
+	heatmap_alpha=1.0,
 	contour_threshold=3,
 	auto_figsize=False,
 	invert=False,
@@ -1183,9 +1319,11 @@ def slices(heatmap_image,
 	slice_spacing=0.4,
 	style='light',
 	title_color='#BBBBBB',
-	position_hspace=0.0,
+	position_vspace=0.0,
 	positive_only=False,
 	negative_only=False,
+	skip_start=0,
+	skip_end=0,
 	):
 	"""
 	Plot coronal `bg_image` slices at a given spacing, and overlay contours from a list of NIfTI files.
@@ -1202,6 +1340,8 @@ def slices(heatmap_image,
 		Path to an overlay image to be printed as a contour.
 	heatmap_threshold : float, optional
 		Value at which to threshold the heatmap_image.
+	heatmap_alpha : float, optional
+		Alpha (opacity, from 0.0 to 1.0) with which to draw the contour image.
 	contour_threshold : float, optional
 		Value at which to threshold the contour_image.
 	auto_figsize : boolean, optional
@@ -1209,7 +1349,7 @@ def slices(heatmap_image,
 	invert : boolean, optional
 		Whether to automatically invert data matrix values (useful if the image consists of negative values, e.g. when dealing with negative contrast agent CBV scans).
 	contour_alpha : float, optional
-		Alpha (transparency) with which to draw the contour image.
+		Alpha (opacity, from 0.0 to 1.0) with which to draw the contour image.
 	contour_color : str, optional
 		Color with which to draw the contour image.
 	cmap : str, optional
@@ -1239,6 +1379,12 @@ def slices(heatmap_image,
 	title_color : string, optional
 		String specifying the desired color for the title.
 		This needs to be specified in-function, because the matplotlibrc styling standard does not provide for title color specification [matplotlibrc_title]
+	position_vspace : float, optional
+		Vertical distance adjustment between slice and coordinate text annotation.
+	skip_start : int, optional
+		Number of slices (at the slice spacing given by `slice_spacing`) to skip at the start of the listing.
+	skip_end : int, optional
+		Number of slices (at the slice spacing given by `slice_spacing`) to skip at the end of the listing.
 
 	References
 	----------
@@ -1304,8 +1450,10 @@ def slices(heatmap_image,
 	slice_thickness = (slice_row[0]**2+slice_row[1]**2+slice_row[2]**2)**(1/2)
 	best_guess_negative = abs(min(slice_row[0:3])) > abs(max(slice_row[0:3]))
 	slices_number = heatmap_data.shape[list(slice_row).index(max(slice_row))]
-	img_min_slice = slice_row[3] + subthreshold_start_slices*slice_thickness
-	img_max_slice = slice_row[3] + (slices_number-subthreshold_end_slices)*slice_thickness
+	skip_start = skip_start*slice_spacing/slice_thickness
+	skip_end = skip_end*slice_spacing/slice_thickness
+	img_min_slice = slice_row[3] + (subthreshold_start_slices+skip_start)*slice_thickness
+	img_max_slice = slice_row[3] + (slices_number-subthreshold_end_slices-skip_end)*slice_thickness
 	bounds = [img_min_slice,img_max_slice]
 	if best_guess_negative:
 		slice_order_is_reversed += 1
@@ -1361,7 +1509,6 @@ def slices(heatmap_image,
 			pad=0.05,
 			panchor=(10.0, 0.5),
 			shrink=0.99,
-			cut_coords = cut_coords,
 			positive_only = positive_only,
 			negative_only = negative_only,
 			cmap=cmap,
@@ -1387,6 +1534,7 @@ def slices(heatmap_image,
 		else:
 			display.add_overlay(heatmap_img,
 				threshold=heatmap_threshold,
+				alpha=heatmap_alpha,
 				cmap=cmap,
 				vmin = vmin,vmax = vmax,
 				)
@@ -1398,7 +1546,7 @@ def slices(heatmap_image,
 					)
 			ax_i.set_xlabel('{} label'.format(ix))
 			slice_title = '{0:.2f}mm'.format(cut_coords[ix])
-			text = ax_i.text(0.5,position_hspace,
+			text = ax_i.text(0.5,-position_vspace,
 				slice_title,
 				horizontalalignment='center',
 				fontsize=rcParams['font.size'],

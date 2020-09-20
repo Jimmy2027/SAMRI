@@ -9,7 +9,12 @@ import shutil
 
 from copy import deepcopy
 import pandas as pd
-from bids.grabbids import BIDSLayout
+
+# PyBIDS 0.6.5 and 0.10.2 compatibility
+try:
+	from bids.grabbids import BIDSLayout
+except ModuleNotFoundError:
+	from bids.layout import BIDSLayout
 
 BEST_GUESS_MODALITY_MATCH = {
 	('FLASH',):'T1w',
@@ -59,6 +64,54 @@ MODALITY_MATCH = {
 	('MTon','MtOn'):'MTon',
 	('MToff','MtOff'):'MToff',
 	}
+
+def extract_volumes(in_files, volume,
+	axis=3,
+	out_files_base='extracted_volume.nii.gz'
+	):
+	"""
+	Iterative wrapper for `samri.pipelines.extract.volume`
+	"""
+
+	from samri.pipelines.extra_functions import extract_volume
+	from os import path
+
+	out_files=[]
+	for ix, in_file in enumerate(in_files):
+		out_file = '{}_{}'.format(ix, out_files_base)
+		out_file = path.abspath(path.expanduser(out_file))
+		extract_volume(in_file, volume, axis=axis, out_file=out_file)
+		out_files.append(out_file)
+	return out_files
+
+def extract_volume(in_file, volume,
+	axis=3,
+	out_file='extracted_volume.nii.gz'
+	):
+	"""
+	Extract one volume from a given axis of a NIfTI file.
+
+	Parameters
+	----------
+
+	in_file : string
+		Path to a NIfTI file with more than one volume on the selected axis.
+	volume : int
+		The volume on the selected axis which to extract.
+		Volume numbering starts at zero.
+	axis : int
+		The axis which to select the volume on.
+		Axis numbering starts at zero.
+	"""
+
+	import nibabel as nib
+	import numpy as np
+
+	img = nib.load(in_file)
+	data = img.get_data()
+	extracted_data = np.rollaxis(data,axis)[volume]
+	img_ = nib.Nifti1Image(extracted_data, img.affine, img.header)
+	nib.save(img_,out_file)
 
 def reset_background(in_file,
 	bg_value=0,
@@ -567,7 +620,7 @@ def physiofile_ts(in_file, column_name,
 		ts = ts[:duration_img]
 	elif duration_img > duration_physios:
 		data = img.get_data()
-		data = data[:,:,:,duration_physio]
+		data = data[:,:,:,:duration_physios]
 		img = nib.Nifti1Image(data, img.affine, img.header)
 
 	if save:
@@ -644,7 +697,6 @@ def get_bids_scan(data_selection,
 	from samri.pipelines.utils import bids_naming
 
 	filtered_data = []
-
 	if selector:
 		subject = selector[0]
 		session = selector[1]
@@ -694,8 +746,7 @@ def get_bids_scan(data_selection,
 
 		dict_slice = filtered_data.to_dict('records')[0]
 
-		return scan_path, typ, task, nii_path, nii_name, eventfile_name, subject_session, metadata_filename, dict_slice
-
+		return scan_path, typ, task, nii_path, nii_name, eventfile_name, subject_session, metadata_filename, dict_slice, ind_type
 BIDS_KEY_DICTIONARY = {
 	'acquisition':['acquisition','ACQUISITION','acq','ACQ'],
 	'task':['task','TASK','stim','STIM','stimulation','STIMULATION'],
@@ -714,7 +765,7 @@ def assign_modality(scan_type, record):
 
 	Returns
 	-------
-	An updated `pandas.DataFrame` obejct.
+	An updated `pandas.DataFrame` object.
 
 	Notes
 	-----
@@ -760,7 +811,7 @@ def get_data_selection(workflow_base,
 	fail_suffix='_failed',
 	):
 	"""
-	Return a `pandas.DaaFrame` object of the Bruker measurement directories located under a given base directory, and their respective scans, subjects, and tasks.
+	Return a `pandas.DataFrame` object of the Bruker measurement directories located under a given base directory, and their respective scans, subjects, and tasks.
 
 	Parameters
 	----------
@@ -790,12 +841,18 @@ def get_data_selection(workflow_base,
 	measurement_path_list = [os.path.join(workflow_base,i) for i in measurements]
 
 	selected_measurements=[]
-	#create a dummy path for bidsgrabber to parse file names from
+	# Create a dummy path for bidsgrabber to parse file names from.
+	# Ideally we could avoid this: https://github.com/bids-standard/pybids/issues/633
 	bids_temppath = '/var/tmp/samri_bids_temppaths/'
 	try:
 		os.mkdir(bids_temppath)
 	except FileExistsError:
 		pass
+	data = {}
+	data['Name'] = ''
+	data['BIDSVersion'] = ''
+	with open(os.path.join(bids_temppath,'dataset_description.json'), 'w') as outfile:
+		json.dump(data, outfile)
 	layout = BIDSLayout(bids_temppath)
 	#populate a list of lists with acceptable subject names, sessions, and sub_dir's
 	for sub_dir in measurement_path_list:
@@ -817,7 +874,12 @@ def get_data_selection(workflow_base,
 						if not match_exclude_ss(entry, match, exclude, selected_measurement, 'session'):
 							break
 						read_variables +=1 #count recorded variables
-					if read_variables == 2:
+					if "##$SUBJECT_position=SUBJ_POS_" in current_line:
+						m = re.match(r'^##\$SUBJECT_position=SUBJ_POS_(?P<position>.+?)$', current_line)
+						position = m.groupdict()['position']
+						read_variables +=1 #count recorded variables
+						selected_measurement['PV_position'] = position
+					if read_variables == 3:
 						selected_measurement['measurement'] = sub_dir
 						scan_program_file = os.path.join(workflow_base,sub_dir,"ScanProgram.scanProgram")
 						scan_dir_resolved = False
@@ -904,7 +966,7 @@ def get_data_selection(workflow_base,
 	data_selection = pd.DataFrame(selected_measurements)
 	try:
 		shutil.rmtree(bids_temppath)
-	except PermissionError:
+	except (FileNotFoundError, PermissionError):
 		pass
 	return data_selection
 
@@ -915,7 +977,33 @@ def select_from_datafind_df(df,
 	failsafe=False,
 	list_output=False,
 	):
+	"""
+	Function that selects values from a Pandas DataFrame.
+	This is useful in the context of nipype workflows, where the function needs to be encapsulated in a node.
 
+	Parameters
+	----------
+
+	df : pandas.DataFrame
+		Pandas DataFrame object with columns that are BIDS identifiers.
+	bids_dictionary: dict
+		Dictionary where its keys are BIDS identifiers.
+	bids_dictionary_override: dict
+		Dictionary where its keys are BIDS identifiers with override values.
+	output_key: str
+		A string that must be one of the column names of the Pandas DataFrame.
+	failsafe : bool
+		A boolean value where the function will either return a scalar value or fail.
+	list_output : bool
+		If True, the function will return a list of values corresponding to the output key.
+
+	Returns
+	-------
+
+	list or scalar
+	If list_output is True, the function will return a list of values corresponding to the output key.
+	Otherwise, the function will return a scalar value corresponding to the first element of the Dataframe (if failsafe = True) or the output_key.
+	"""
 	if bids_dictionary_override:
 		override = [i for i in bids_dictionary_override.keys()]
 	else:
@@ -933,7 +1021,14 @@ def select_from_datafind_df(df,
 	if bids_dictionary_override:
 		for key in bids_dictionary_override:
 			if bids_dictionary_override[key] != '':
-				df=df[df[key]==bids_dictionary_override[key]]
+				try:
+					df=df[df[key]==bids_dictionary_override[key]]
+				except (KeyError, TypeError):
+					path_string = '{}-{}'.format(key, bids_dictionary_override[key])
+					#print(path_string)
+					#print(df.columns)
+					#print(df)
+					df=df[df['path'].str.contains(path_string)]
 
 	if list_output:
 		selection = df[output_key].tolist()
@@ -975,3 +1070,35 @@ def regressor(timecourse,
 
 	output = [my_dict]
 	return output
+
+def flip_if_needed(data_selection, nii_path, ind,
+	output_filename='flipped.nii.gz',
+	):
+	"""Check based on a SAMRI data selection of Bruker Paravision scans, if the orientation is incorrect (“Prone”, terminologically correct, but corresponding to an incorrect “Supine” representation in Bruker ParaVision small animal scans), and flip the scan with respect to the axial axis if so.
+
+	Parameters
+	----------
+
+	data_selection : pandas.DataFrame
+		Pandas Dataframe object, with indices corresponding to the SAMRI data source iterator and columns including 'PV_position'.
+	nii_path : str
+		Path to a NIfTI file.
+	ind : int
+		Index of the `data_selection` entry.
+	output_filename : str, optional
+		String specifying the desired flipped NIfTI filename for potential flipped output.
+	"""
+
+	from os import path
+	from samri.manipulations import flip_axis
+	position = data_selection.iloc[ind]['PV_position']
+	output_filename = path.abspath(path.expanduser(output_filename))
+	nii_path = path.abspath(path.expanduser(nii_path))
+	# The output_filename variable may not contain a format suffix, as it is used to generate associated files.
+	if output_filename[-7:] != '.nii.gz' and output_filename[-4:] != '.nii':
+		output_filename = '{}.nii.gz'.format(output_filename)
+	if position == 'Prone':
+		output_filename = flip_axis(nii_path, axis=2, out_path=output_filename)
+	else:
+		output_filename = nii_path
+	return output_filename
